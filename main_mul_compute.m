@@ -53,17 +53,17 @@ function main_mul_compute
     figure;
     
     styles = {'bo-', 'b*-', 'rs-', 'rx-', 'gd-', 'mo-'};
-    labels = {'CN_2^*', 'CN_2^*(2)', 'Q iE_2^*', 'Q iE_2^*(2)', 'Q iE_2^*/Q', 'Q iE_2^*/box'};
+    labels = {'CN_2^*', 'CN_2^*(2)', 'iE_2^*', 'iE_2^*(2)', 'iE_2^*/Q', 'iE_2^*/box'};
     methods = [+(1), +(2), -(1), -(2), -(1 + 1000), -(1 + 2000)];
 
     % Debugging options:
 %     styles = {'mo-'}; labels = {'CN*'}; methods = [(1)];
 %     styles = {'mo-'}; labels = {'CN*(2)'}; methods = [(2)];
 %     styles = {'mo-'}; labels = {'CN*(3)'}; methods = [(3)];
-%     styles = {'mo-'}; labels = {'Q iE_2^*'}; methods = [-(1)];
-%     styles = {'mo-'}; labels = {'Q iE_2^*(2)'}; methods = [-(2)];
-%     styles = {'mo-'}; labels = {'Q iE_2^*/Q'}; methods = [-(1 + 1000)];
-%     styles = {'mo-'}; labels = {'Q iE_2^*/\box'}; methods = [-(1 + 2000)];
+%     styles = {'mo-'}; labels = {'P iE_2^*'}; methods = [-(1)];
+%     styles = {'mo-'}; labels = {'P iE_2^*(2)'}; methods = [-(2)];
+%     styles = {'mo-'}; labels = {'P iE_2^*/Q'}; methods = [-(1 + 1000)];
+%     styles = {'mo-'}; labels = {'P iE_2^*/\box'}; methods = [-(1 + 2000)];
 
     % Output filename
     filename = 'main_mul_results';
@@ -90,7 +90,7 @@ function main_mul_compute
             
             % 2nd moment
             f = @(t) Vec(REF.M2(t,t))';
-            g = @(t) Vec(ppfem_eval(RES.diag_QE, t) * RES.diag_Q_M2)';
+            g = @(t) Vec(ppfem_eval(RES.diag_PPE, t) * RES.diag_PP_M2)';
             
 %             % Covariance
 %             f = @(t) Vec(REF.CovX(t,t))';
@@ -195,18 +195,12 @@ function [RES, REF] = compute(problemdata, mesht, method)
     
     do_postprocessing = (abs(method) >= 1e4);
     method = sign(method) * mod(abs(method), 1e4);
-    if do_postprocessing
-        % Postprocessing ON
-        % Postprocessed 1d solution space
-        QE = ppfem_construct(mesht, P-1, 'L');
-        % Postprocessing operator = 
-        % projection onto piecewise polynomials
-        Q = ppfem_gramian(QE) \ ppfem_gramian(QE, E);
-    else
-        % Postprocessing OFF
-        QE = E;
-        Q = 1;
-    end
+    
+    % Preprocessed 1d solution space
+    QE = ppfem_construct(mesht, P-1, 'L');
+    % Preprocessing operator = 
+    % projection onto piecewise polynomials
+    Q = ppfem_gramian(QE) \ ppfem_gramian(QE, E);
     
 
     %%%%%%%%%%%%%%%%%%%%
@@ -253,8 +247,6 @@ function [RES, REF] = compute(problemdata, mesht, method)
         Delta = @(C) Mat(F_tt' * Int0T' * E_tt * Vec(C));
         Delat = @(Y) Mat(E_tt' * Int0T  * F_tt * Vec(Y));
         clear Int0T;
-    
-        % Note: Postprocessing will still be done on the iE* solution
         
     elseif ((1000 < -method) && (-method < 2000))
         % iE*/Q family: Include projection Q inside Delta
@@ -271,11 +263,7 @@ function [RES, REF] = compute(problemdata, mesht, method)
         Delta = @(C) fn' * diag(diag(C) ./ diff(mesht)') * fn;
         Delat = @(Y) diag(diag(fn * Y * fn') ./ diff(mesht)');
         clear fn;
-        
-    elseif ((3000 < -method) && (-method < 4000))
-        % iE*/stable variant
-        error('NOT IMPLEMENTED');
-        
+    
     else
         error('Unknown method');
     end
@@ -317,6 +305,18 @@ function [RES, REF] = compute(problemdata, mesht, method)
     % Collect output
     %%%%%%%%%%%%%%%%%%%%
     
+    if do_postprocessing
+        PPE = QE;
+        PP = Q;
+        diag_PPE = diag_QE;
+        PPE_tt = QE_tt;
+    else
+        PPE = E;
+        PP = 1;
+        diag_PPE = diag_E;
+        PPE_tt = E_tt;
+    end
+    
     RES.problemdata = problemdata;
     RES.mesht = mesht;
     RES.method = method;
@@ -327,19 +327,14 @@ function [RES, REF] = compute(problemdata, mesht, method)
     RES.M2 = M2;
     RES.CovX = CovX;
     %
-    RES.QE = QE;
-    RES.Q_EX = Q * EX;
-    RES.Q_M2 = Q * M2 * Q';
-    RES.Q_CovX = Q * CovX * Q';
+    RES.PPE = PPE;
+    RES.PP_EX = PP * EX;
+    RES.PP_M2 = PP * M2 * PP';
+    RES.PP_CovX = PP * CovX * PP';
     %
-    RES.diag_QE = diag_QE;
-    RES.diag_Q_M2 = QE_tt * Vec(RES.Q_M2);
-    RES.diag_Q_CovX = QE_tt * Vec(RES.Q_CovX);
-    %
-%     RES.diag_QE = dF; % Possible alternative to diagonal extraction
-%     p = dF.M \ ppfem_gramian(dF, diag_QE);
-%     RES.diag_Q_M2 = p * QE_tt * Vec(RES.Q_M2);
-%     RES.diag_Q_CovX = p * QE_tt * Vec(RES.Q_CovX);
+    RES.diag_PPE = diag_PPE;
+    RES.diag_PP_M2 = PPE_tt * Vec(RES.PP_M2);
+    RES.diag_PP_CovX = PPE_tt * Vec(RES.PP_CovX);
 end
 
 
