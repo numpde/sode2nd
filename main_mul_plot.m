@@ -19,6 +19,8 @@ function main_mul_plot
     
     fig_conv = figure;
     
+    set(0, 'defaulttextinterpreter', 'latex');
+    
     % Handle / method for legend
     HH = NaN(1, length(D.methods));
     for method = D.methods
@@ -55,7 +57,8 @@ function main_mul_plot
 %     % Reverse order on the legend
 %     reverse = @(X) X(length(X) : -1 : 1); HH = reverse(HH); D.labels = reverse(D.labels);
 
-    nicer(legend(HH, D.labels{:}, 'Location', 'NW'));
+    h = nicer(legend(HH, D.labels{:}, 'Location', 'NW'));
+    set(h, 'Interpreter', 'latex');
     
     % Save figure
     if (isequal(input('Save figure (y/n)? ', 's'), 'y'))
