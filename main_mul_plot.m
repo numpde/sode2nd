@@ -37,6 +37,7 @@ function main_mul_plot
         disp('--');
         
         label = strrep(label, 'Q ', '');
+        label = strrep(label, 'P ', '');
         label = strrep(label, 'iE', '{\textrm{iE}}');
         label = strrep(label, 'CN', '{\textrm{CN}}');
         label = strrep(label, '*', '{\star}');
